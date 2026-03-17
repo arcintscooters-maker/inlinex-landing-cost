@@ -1,4 +1,5 @@
 import os
+import traceback
 from flask import Flask, request, jsonify, render_template
 from invoice_parser import parse_invoice
 
@@ -20,11 +21,16 @@ def parse():
         if invoice_sgd <= 0:
             return jsonify({"error": "Invoice SGD amount must be > 0"}), 400
 
+        filename = file.filename
         file_bytes = file.read()
-        result = parse_invoice(file.filename, file_bytes)
+
+        print(f"[DEBUG] filename={filename} size={len(file_bytes)} bytes")
+
+        result = parse_invoice(filename, file_bytes)
+
+        print(f"[DEBUG] parsed ok: {len(result['items'])} items, total={result['invoice_total_usd']}")
 
         inv_usd = result["invoice_total_usd"]
-
         for item in result["items"]:
             pct = item["total_usd"] / inv_usd
             line_sgd = pct * invoice_sgd
@@ -40,10 +46,25 @@ def parse():
 
         return jsonify(result)
 
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
     except Exception as e:
-        return jsonify({"error": f"Failed to parse invoice: {str(e)}"}), 500
+        tb = traceback.format_exc()
+        print(f"[ERROR] {tb}")
+        return jsonify({"error": str(e), "detail": tb}), 500
+
+
+@app.route("/debug", methods=["GET"])
+def debug():
+    """Simple endpoint to verify the app and imports are working."""
+    try:
+        import pdfplumber
+        import openpyxl
+        return jsonify({
+            "status": "ok",
+            "pdfplumber": pdfplumber.__version__,
+            "openpyxl": openpyxl.__version__,
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 
 if __name__ == "__main__":
