@@ -270,6 +270,90 @@ def parse_flying_eagle_excel(file_bytes):
     }
 
 
+
+# ─── Universkate / FR Skates PDF Parser ──────────────────────────────────────
+
+def parse_universkate_pdf(file_bytes):
+    lines = []
+    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                lines.extend(text.split('\n'))
+
+    invoice_no = ''
+    supplier = 'Universkate / FR Skates'
+    invoice_total = 0.0
+    items = []
+
+    for line in lines:
+        m = re.search(r'PROFORMA\s+(\d+)', line)
+        if m and not invoice_no:
+            invoice_no = 'PRO-' + m.group(1)
+        m = re.search(r'Net\s+à\s+payer\s+€\s+([\d\s,]+)', line)
+        if m:
+            invoice_total = float(m.group(1).strip().replace(' ','').replace(',','.'))
+
+    ean_re = re.compile(r'^(\S+)\s+(\d{13})\s+(.+)$')
+
+    for line in lines:
+        line = line.strip()
+        m = ean_re.match(line)
+        if not m:
+            continue
+        sku = m.group(1)
+        if sku.startswith('SIRET') or sku.startswith('EORI'):
+            continue
+        ean = m.group(2)
+        rest = m.group(3).strip()
+
+        tokens = rest.split()
+        if len(tokens) < 3:
+            continue
+
+        total_str = tokens[-1]
+        unit_str = tokens[-2]
+        qty_str = tokens[-3]
+
+        if ',' not in total_str or ',' not in unit_str:
+            continue
+        if not qty_str.isdigit():
+            continue
+
+        desc = ' '.join(tokens[:-3]).strip()
+        qty = int(qty_str)
+        unit_eur = float(unit_str.replace(' ','').replace(',','.'))
+        total_eur = float(total_str.replace(' ','').replace(',','.'))
+
+        if desc.startswith('FR -'):
+            brand = 'FR Skates'
+        elif 'INTUITION' in desc:
+            brand = 'Intuition'
+        else:
+            brand = 'Universkate'
+
+        items.append({
+            'pos': len(items) + 1,
+            'sku': sku,
+            'ean': ean,
+            'description': desc,
+            'brand': brand,
+            'qty': qty,
+            'unit_usd': unit_eur,   # EUR stored as usd field (user pays SGD anyway)
+            'total_usd': total_eur,
+        })
+
+    if invoice_total == 0 and items:
+        invoice_total = round(sum(i['total_usd'] for i in items), 2)
+
+    return {
+        'invoice_no': invoice_no,
+        'supplier': supplier,
+        'invoice_total_usd': invoice_total,
+        'items': items,
+        'notes': 'Prices are in EUR. Landing cost calculated from your SGD payment.'
+    }
+
 # ─── Generic fallback (tries PDF line parsing) ───────────────────────────────
 
 def parse_generic_pdf(file_bytes):
@@ -352,6 +436,8 @@ def parse_invoice(filename, file_bytes):
 
         if 'powerslide' in first_page.lower() or 'IN-' in first_page:
             result = parse_powerslide_pdf(file_bytes)
+        elif 'universkate' in first_page.lower() or 'PROFORMA' in first_page:
+            result = parse_universkate_pdf(file_bytes)
         else:
             result = parse_generic_pdf(file_bytes)
 
