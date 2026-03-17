@@ -157,16 +157,7 @@
 
     <!-- FORM -->
     <div id="form-section">
-      <div class="card">
-        <div class="card-label">00 — Anthropic API Key</div>
-        <div class="field">
-          <label>API Key</label>
-          <div class="field-wrap">
-            <input id="api-key" class="no-prefix" type="password" placeholder="sk-ant-api03-..." />
-          </div>
-          <div class="hint">Saved in your browser. Get yours at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></div>
-        </div>
-      </div>
+
 
       <div class="card">
         <div class="card-label">01 — Invoice File</div>
@@ -254,11 +245,6 @@
   </main>
 
   <script>
-    // Persist API key
-    const apiKeyInput = document.getElementById("api-key");
-    apiKeyInput.value = localStorage.getItem("inlinex_api_key") || "";
-    apiKeyInput.addEventListener("input", () => localStorage.setItem("inlinex_api_key", apiKeyInput.value));
-
     // File handling
     let selectedFile = null;
     const dropZone = document.getElementById("drop-zone");
@@ -290,15 +276,13 @@
 
     // Validate
     function updateBtn() {
-      const key = apiKeyInput.value.trim();
       const inv = parseFloat(document.getElementById("invoice-sgd").value);
       const ship = parseFloat(document.getElementById("shipping-sgd").value);
-      const ok = key.startsWith("sk-") && selectedFile && inv > 0 && ship >= 0;
+      const ok = selectedFile && inv > 0 && ship >= 0;
       document.getElementById("calc-btn").disabled = !ok;
     }
 
     ["invoice-sgd", "shipping-sgd"].forEach(id => document.getElementById(id).addEventListener("input", updateBtn));
-    apiKeyInput.addEventListener("input", updateBtn);
 
     function showError(msg) {
       const box = document.getElementById("error-box");
@@ -320,7 +304,6 @@
 
       try {
         const fd = new FormData();
-        fd.append("api_key", apiKeyInput.value.trim());
         fd.append("invoice_sgd", document.getElementById("invoice-sgd").value);
         fd.append("shipping_sgd", document.getElementById("shipping-sgd").value);
         fd.append("invoice", selectedFile);
