@@ -381,3 +381,4 @@ if __name__ == '__main__':
     print(f"Invoice: {result2['invoice_no']}, Items: {len(result2['items'])}, Total: {result2['invoice_total_usd']}")
     for item in result2['items']:
         print(f"  {item['pos']:2}. {item['sku']:<35} qty={item['qty']} total={item['total_usd']}")
+
