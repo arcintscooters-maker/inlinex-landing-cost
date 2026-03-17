@@ -24,10 +24,18 @@ def parse():
         filename = file.filename
         file_bytes = file.read()
 
-        print(f"[DEBUG] filename={filename} size={len(file_bytes)} bytes")
+        print(f"[DEBUG] filename='{filename}' mimetype='{file.mimetype}' size={len(file_bytes)}")
+
+        # Force correct filename extension based on mimetype if needed
+        if not filename.lower().endswith(('.pdf', '.xlsx', '.xls')):
+            mt = file.mimetype or ''
+            if 'pdf' in mt:
+                filename = 'invoice.pdf'
+            elif 'spreadsheet' in mt or 'excel' in mt or 'officedocument' in mt:
+                filename = 'invoice.xlsx'
+            print(f"[DEBUG] filename corrected to '{filename}'")
 
         result = parse_invoice(filename, file_bytes)
-
         print(f"[DEBUG] parsed ok: {len(result['items'])} items, total={result['invoice_total_usd']}")
 
         inv_usd = result["invoice_total_usd"]
@@ -54,10 +62,8 @@ def parse():
 
 @app.route("/debug", methods=["GET"])
 def debug():
-    """Simple endpoint to verify the app and imports are working."""
     try:
-        import pdfplumber
-        import openpyxl
+        import pdfplumber, openpyxl
         return jsonify({
             "status": "ok",
             "pdfplumber": pdfplumber.__version__,
