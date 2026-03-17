@@ -1,6 +1,6 @@
 import os
 from flask import Flask, request, jsonify, render_template
-from parser import parse_invoice
+from invoice_parser import parse_invoice
 
 app = Flask(__name__)
 
