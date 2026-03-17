@@ -339,20 +339,23 @@ def parse_generic_pdf(file_bytes):
 def parse_invoice(filename, file_bytes):
     filename_lower = filename.lower()
 
-    if filename_lower.endswith('.pdf'):
-        # Detect supplier from content
+    # Detect by magic bytes (reliable regardless of filename/mimetype)
+    is_pdf = file_bytes[:4] == b'%PDF'
+    is_xlsx = file_bytes[:4] == b'PK'
+
+    if is_pdf or filename_lower.endswith('.pdf'):
         try:
             with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
                 first_page = pdf.pages[0].extract_text() or ''
-        except:
-            first_page = ''
+        except Exception as e:
+            raise ValueError(f"Could not read PDF: {e}")
 
         if 'powerslide' in first_page.lower() or 'IN-' in first_page:
             result = parse_powerslide_pdf(file_bytes)
         else:
             result = parse_generic_pdf(file_bytes)
 
-    elif filename_lower.endswith(('.xlsx', '.xls')):
+    elif is_xlsx or filename_lower.endswith(('.xlsx', '.xls')):
         result = parse_flying_eagle_excel(file_bytes)
     else:
         raise ValueError("Unsupported file type. Please upload PDF or Excel (.xlsx).")
