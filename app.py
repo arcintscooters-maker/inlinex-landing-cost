@@ -13,13 +13,13 @@ def index():
 @app.route("/parse", methods=["POST"])
 def parse():
     try:
-        api_key = request.form.get("api_key", "").strip()
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
         invoice_sgd = float(request.form.get("invoice_sgd", 0))
         shipping_sgd = float(request.form.get("shipping_sgd", 0))
         file = request.files.get("invoice")
 
-        if not api_key or not api_key.startswith("sk-"):
-            return jsonify({"error": "Invalid API key"}), 400
+        if not api_key:
+            return jsonify({"error": "API key not configured on server. Add ANTHROPIC_API_KEY in Railway Variables."}), 500
         if not file:
             return jsonify({"error": "No file uploaded"}), 400
         if invoice_sgd <= 0:
@@ -91,7 +91,6 @@ Rules:
         parsed = json.loads(clean)
 
         inv_usd = parsed["invoice_total_usd"]
-        total_landed = invoice_sgd + shipping_sgd
 
         for item in parsed["items"]:
             pct = item["total_usd"] / inv_usd
@@ -104,14 +103,14 @@ Rules:
 
         parsed["invoice_sgd"] = invoice_sgd
         parsed["shipping_sgd"] = shipping_sgd
-        parsed["total_landed"] = round(total_landed, 2)
+        parsed["total_landed"] = round(invoice_sgd + shipping_sgd, 2)
 
         return jsonify(parsed)
 
     except json.JSONDecodeError:
         return jsonify({"error": "Could not parse AI response as JSON. Try again."}), 500
     except anthropic.AuthenticationError:
-        return jsonify({"error": "Invalid API key. Check your Anthropic API key."}), 401
+        return jsonify({"error": "Invalid API key on server. Check Railway Variables."}), 401
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
