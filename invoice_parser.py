@@ -33,23 +33,24 @@ def parse_powerslide_pdf(file_bytes):
         line = re.sub(r'(\S)(\d{13})', r'\1 \2', line)
         fixed_lines.append(line)
 
+    # Matches standard lines with optional discount column
+    # Also handles: no-discount lines, -left/-right SKU suffixes
     item_re = re.compile(
-        r'^(\d+)\s+'
-        r'(\S+)\s+'
-        r'(.+?)\s+'
-        r'(\d{13})\s+'
-        r'\d+\s+'
-        r'([\d.]+)\s+'
-        r'(?:Pair|pc\.|Pack)\s+'
-        r'([\d.]+)\s+'
-        r'(?:-[\d.]+%)?\s*'
-        r'([\d.]+)$'
+        r'^(\d+)\s+'         # pos
+        r'(\S+)\s+'          # sku (may end with -left, -right, or be partial)
+        r'(.+?)\s+'           # description
+        r'(\d{13})\s+'       # EAN
+        r'\d+\s+'            # tariff
+        r'([\d.]+)\s+'       # qty
+        r'(?:Pair|pc\.|Pack|Set)\s+'  # unit type
+        r'([\d.]+)\s+'       # unit price
+        r'(?:-[\d.]+%)?\s*'  # optional discount
+        r'([\d.]+)$'          # total
     )
 
-    # SKU suffix: short alphanumeric continuation on its own line
-    sku_cont_re = re.compile(r'^([A-Z0-9]{1,4}(?:-[A-Z0-9]{1,4})*)$')
+    # SKU suffix continuation: e.g. '34', 'XL', '40-43', 'right'
+    sku_cont_re = re.compile(r'^([0-9]{1,4}|[A-Z]{1,5}|[0-9]{1,2}-[0-9]{1,2})$')
 
-    # Brand line: ALLCAPS words, not weight/China lines
     def extract_brand(lines, start, window=5):
         skip_patterns = [
             r'^Net item', r'^Gross item', r"Republic of China",
@@ -65,7 +66,6 @@ def parse_powerslide_pdf(file_bytes):
                 continue
             words = l.split()
             if words and words[0].isupper() and len(words[0]) > 2:
-                # Take words before "People's"
                 brand_words = []
                 for w in words:
                     if w == "People's":
@@ -87,12 +87,17 @@ def parse_powerslide_pdf(file_bytes):
             unit_usd = float(m.group(6))
             total_usd = float(m.group(7))
 
-            # Check next line for SKU suffix
+            # Check next line for SKU suffix (e.g. '34', 'XL')
             if i + 1 < len(fixed_lines):
                 nxt = fixed_lines[i + 1].strip()
-                if sku_cont_re.match(nxt):
+                if sku_cont_re.match(nxt) and not re.match(r'^\d{2}\s+', nxt):
                     sku = sku + nxt
                     i += 1
+                # Handle split SKU where first part ends with dash e.g. '908050-' + 'right ...'
+                elif sku.endswith('-'):
+                    first_word = nxt.split()[0] if nxt else ''
+                    if first_word and first_word.isalpha() and len(first_word) <= 8:
+                        sku = sku + first_word
 
             brand = extract_brand(fixed_lines, i + 1)
 
@@ -381,7 +386,7 @@ def parse_generic_pdf(file_bytes):
             invoice_total = float(m.group(1).replace(',', ''))
 
     item_re = re.compile(
-        r'^(\d+)\s+(\S+)\s+(.+?)\s+(\d{13})\s+\d+\s+([\d.]+)\s+(?:Pair|pc\.|Pack|PRS)\s+([\d.]+)\s+(?:-[\d.]+%)?\s*([\d.]+)$'
+        r'^(\d+)\s+(\S+)\s+(.+?)\s+(\d{13})\s+\d+\s+([\d.]+)\s+(?:Pair|pc\.|Pack|Set|PRS)\s+([\d.]+)\s+(?:-[\d.]+%)?\s*([\d.]+)$'
     )
 
     i = 0
