@@ -28,9 +28,15 @@ def parse_powerslide_pdf(file_bytes):
             invoice_total = float(m.group(1).replace(',', ''))
 
     # Fix lines where EAN is glued to description (no space before 13-digit number)
+    # Handle case where digits before EAN create a longer number (e.g. "3x1254040333593240")
+    # by specifically splitting on known EAN prefixes (4040333 for Powerslide, 693633 for Flying Eagle)
     fixed_lines = []
     for line in lines:
-        line = re.sub(r'(\S)(\d{13})', r'\1 \2', line)
+        # First, split known EAN prefixes that may be glued to preceding text/digits
+        line = re.sub(r'(\S)(4040333\d{6})', r'\1 \2', line)
+        line = re.sub(r'(\S)(693633\d{7})', r'\1 \2', line)
+        # Fallback: generic 13-digit EAN split (non-digit followed by 13 digits)
+        line = re.sub(r'([^\d\s])(\d{13})(?=\s)', r'\1 \2', line)
         fixed_lines.append(line)
 
     # Matches standard lines with optional discount column
