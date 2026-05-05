@@ -705,7 +705,7 @@ def parse_invoice(filename, file_bytes):
         if not is_flying_eagle_pdf and 'sac' in filename_lower:
             is_flying_eagle_pdf = _is_cid_pdf(file_bytes)
 
-        if 'powerslide' in first_page.lower() or 'IN-' in first_page:
+        if 'powerslide' in first_page.lower() or re.search(r'Invoice\s+IN-', first_page):
             result = parse_powerslide_pdf(file_bytes)
         elif 'universkate' in first_page.lower() or 'PROFORMA' in first_page:
             result = parse_universkate_pdf(file_bytes)
